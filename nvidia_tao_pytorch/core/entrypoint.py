@@ -112,7 +112,8 @@ def dual_output(log_file=None):
         yield sys.stdout, None
 
 
-def launch(args, unknown_args, subtasks, network=None):
+def launch(args, unknown_args, subtasks, network=None, *,
+           use_torchrun=False, preserve_cuda=False, strict_multinode=False):
     """CLI function that executes subtasks.
 
     Args:
@@ -246,6 +247,11 @@ def launch(args, unknown_args, subtasks, network=None):
             ]
         except Exception as e:
             logging.warning(f"[Multinode] Error overriding configs: {e}")
+            if strict_multinode:
+                raise RuntimeError(
+                    "Strict multinode launch validation failed; refusing to "
+                    "fall back to a single-node job"
+                ) from e
             logging.warning("[Multinode] Using default configs.")
             num_nodes = 1
             num_gpus = torch.cuda.device_count()
@@ -264,8 +270,9 @@ def launch(args, unknown_args, subtasks, network=None):
         log_file = f"{logs_dir}/{os.getenv('JOB_ID')}/microservices_log.txt"
 
     # Create a system call.
-    if network in LIGHTNING_EXCLUDED_NETWORKS:
-        os.environ["CUDA_VISIBLE_DEVICES"] = os.environ["TAO_VISIBLE_DEVICES"]
+    if use_torchrun or network in LIGHTNING_EXCLUDED_NETWORKS:
+        if not (preserve_cuda and os.environ.get("CUDA_VISIBLE_DEVICES")):
+            os.environ["CUDA_VISIBLE_DEVICES"] = os.environ["TAO_VISIBLE_DEVICES"]
         if not os.getenv("RANK") and os.getenv("NODE_RANK"):
             os.environ["RANK"] = os.getenv("NODE_RANK")
         call = (
