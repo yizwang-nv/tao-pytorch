@@ -3,8 +3,8 @@
 
 """DINOv3 Train Script.
 
-Thin wrapper that builds :class:`DinoV3PlModel` and reuses the inherited (nvdinov2)
-Lightning training flow and data module.
+Build :class:`DinoV3PlModel` with the DINOv3-owned manifest data module while
+reusing the inherited NVDINOv2 training mathematics and transforms.
 """
 
 import os
@@ -17,8 +17,9 @@ from nvidia_tao_pytorch.core.hydra.hydra_runner import hydra_runner
 from nvidia_tao_pytorch.core.initialize_experiments import initialize_train_experiment
 from nvidia_tao_pytorch.core.tlt_logging import obfuscate_logs
 from nvidia_tao_pytorch.config.dinov3.default_config import ExperimentConfig, validate_img_size
-from nvidia_tao_pytorch.ssl.nvdinov2.dataloader.pl_dinov2_data_module import DinoV2DataModule
+from nvidia_tao_pytorch.ssl.dinov3.dataloader.pl_dinov3_data_module import DinoV3DataModule
 from nvidia_tao_pytorch.ssl.dinov3.model.pl_model import DinoV3PlModel
+from nvidia_tao_pytorch.ssl.dinov3.utils.runtime_spec import publish_runtime_spec
 
 
 def _resolve_strategy(experiment_config):
@@ -62,7 +63,7 @@ def run_experiment(experiment_config, key):
 
     precision = experiment_config.train.precision
 
-    dm = DinoV2DataModule(experiment_config)
+    dm = DinoV3DataModule(experiment_config)
 
     model = DinoV3PlModel(experiment_config)
 
@@ -95,7 +96,7 @@ spec_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 @hydra_runner(
     config_path=os.path.join(spec_root, "experiment_specs"), config_name="experiment_spec", schema=ExperimentConfig
 )
-@monitor_status(name="DINOv3", mode="train")
+@monitor_status(name="DINOv3", mode="train", spec_writer=publish_runtime_spec)
 def main(cfg: ExperimentConfig) -> None:
     """Run the training process."""
     # Obfuscate logs.
